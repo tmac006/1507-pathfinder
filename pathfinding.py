@@ -12,6 +12,7 @@ pointList = []
 relativeList = []
 distances = []
 angles = []
+events = []
 
 def CreateWindow():
     global img, original_img
@@ -38,18 +39,20 @@ def redraw_points():
     global img
     temp_img = img.copy()
     for point in relativeList:
-        # Draw points as circles
         abs_point = (point[0] + origin[0], origin[1] - point[1])  # Convert relative to absolute
         cv2.circle(temp_img, abs_point, 3, (0, 225, 0), -1)
-        # Put text showing the coordinates
         cv2.putText(temp_img, f"({point[0]},{point[1]})", (abs_point[0] + 10, abs_point[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1, cv2.LINE_AA)
     for index, point in enumerate(relativeList):
         if index + 1 < len(relativeList):
             abs_point = (point[0] + origin[0], origin[1] - point[1])
             next_abs_point = (relativeList[index + 1][0] + origin[0], origin[1] - relativeList[index + 1][1])
             cv2.line(temp_img, abs_point, next_abs_point, (0, 225, 0), 2)
+    for event in events:
+        abs_event = (event[0] + origin[0], origin[1] - event[1])
+        cv2.circle(temp_img, abs_event, 5, (0, 0, 255), -1)  # Draw event markers as larger red circles
+        cv2.putText(temp_img, "Event", (abs_event[0] + 10, abs_event[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
     cv2.imshow("1507 Pathfinding", temp_img)
-    print("Points redrawn")
+    print("Points and events redrawn")
 
 def CreatePath(event, x, y, flags, params):
     global origin_set, origin, filename
@@ -80,10 +83,12 @@ def CreatePath(event, x, y, flags, params):
         print(f"Relative points: {relativeList}")
         with open(filename + ".csv", 'w', newline='') as file:  # Write data to CSV
             writer = csv.writer(file)
-            field = ["Distance (In)", "Direction (Deg)", "Points (x, y)"]
+            field = ["Distance (In)", "Direction (Deg)", "Points (x, y)", "Comments"]
             writer.writerow(field)
             for index, dist in enumerate(distances):
-                writer.writerow([dist, angles[index], relativeList[index]])
+                writer.writerow([dist, angles[index], relativeList[index], ""])
+            for event in events:
+                writer.writerow(["", "", event, "Event"])
         print(f"Your values are now in {filename}.csv")
 
 def ViewPath(file):
@@ -93,6 +98,8 @@ def ViewPath(file):
     with open(file + ".csv") as points:
         next(points)  # Skip the title row
         for row in points:
+            if "Event" in row:
+                continue
             x, y = map(int, row.split(",")[2].strip("() \n").split(","))
             readList.append((x, y))
     for index, point in enumerate(readList):
@@ -114,6 +121,12 @@ def main():
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):  # Press 'q' to exit
                     break
+                elif key == ord('x'):  # Press 'x' to place an event marker
+                    if origin_set:
+                        event_x, event_y = relativeList[-1]  # Use the last placed point as the event marker
+                        events.append((event_x, event_y))
+                        print(f"Event marker placed at ({event_x}, {event_y})")
+                        redraw_points()
             cv2.destroyAllWindows()
             print("Exiting main loop and closing windows")
     elif choice.upper() == 'R':
